@@ -18,7 +18,7 @@ class AppCreator {
         this.location = params.location;
         this.tenantId = params.tenant;
         this.subscriptionId = params.subscription;
-        this.resourceGroupname = params.group;
+        this.resourceGroupName = params.group;
         this.webAppName = params.appname;
         this.webPlanName = this.webAppName + "-asp";
         this.appInsightsName = this.webAppName;
@@ -32,7 +32,7 @@ class AppCreator {
     }
 
     createResourceGroup(resourceInfo) {
-        var group =  {
+        let group =  {
             location: this.location
         };
         let rgmanagement = new ResourceManagement.ResourceManagementClient(resourceInfo.credentials, this.subscriptionId);
@@ -40,10 +40,14 @@ class AppCreator {
     }
 
     createAppInsights(resourceInfo) {
-        var envelope = {
+        let envelope = {
             location: this.location,
-            properties: {}
+            properties: {},
+            tags: {
+            }
         };
+        let webAppId = `${resourceInfo.resourceGroup.id}/providers/Microsoft.Web/sites/${this.webAppName}`
+        envelope.tags[`hidden-link:${webAppId}`] = 'Resource';
         let management = new ResourceManagement.ResourceManagementClient(resourceInfo.credentials, this.subscriptionId);
         return management.resources.createOrUpdate(
             this.resourceGroupName, // resource group
@@ -52,7 +56,7 @@ class AppCreator {
             'components',           // resource type
             this.appInsightsName,   // resource name
             '2014-04-01',           // api version
-            envelope);          
+            envelope);
     }
 
     createHostingPlan(resourceInfo) {
@@ -101,43 +105,55 @@ class AppCreator {
             'siteextensions',                               // resource type
             'Microsoft.ApplicationInsights.AzureWebSites',  // resource name
             '2015-08-01',                                   // api version
-            envelope);          
+            envelope);
     }
 }
 
 
+function printUsage() {
+    console.log('usage: <command> --tenant <tenant_id> --subscription <id> --location <region> --group <resource_group> --appname <webapp_name>');
+}
+
+function validateArgs(params) {
+    if (!params.tenant || !params.subscription || !params.location || !params.group || !params.appname) {
+        printUsage();
+        process.exit(-1);
+    }
+}
+
 if ( process.argv.length < 2 ) {
-    console.log('usage: <command> -tenant <tenant_id> -subscription <id> -location <region> -group <resource_group> -appname <webapp_name>');
+    printUsage();
     process.exit(-1);
 }
 
 const argv = parseArgs(process.argv.slice(2));
+validateArgs(argv);
 
 const creator = new AppCreator(argv);
+
 
 creator.login(resources)
     .then(credentials => {
         console.log('login completed');
         resources.credentials = credentials;
-        return appCreator.createResourceGroup(resources);
+        return creator.createResourceGroup(resources);
     }).then(resourceGroup => {
-        resources.resourceGroup = resourceGroup;
         console.log('Resource Group created: ' + resourceGroup.id);
-        return appCreator.createAppInsights(resources);
+        resources.resourceGroup = resourceGroup;
+        return creator.createAppInsights(resources);
     }).then(appInsights => {
-        console.log(appInsights);
-        resources.appInsights = appInsights;
         console.log('App Insights created: ' + appInsights.id);
-        return appCreator.createHostingPlan(resources);
+        resources.appInsights = appInsights;
+        return creator.createHostingPlan(resources);
     }).then(servicePlan => {
         console.log('Hosting plan created: ' + servicePlan.id);
         resources.webHostingPlan = servicePlan;
-        return appCreator.createWebApp(resources);
+        return creator.createWebApp(resources);
     }).then(webApp => {
-        resources.webApp = webApp;
         console.log('Web App created: ' + webApp.id);
-        return appCreator.addAppInsightsExtension(resources);
+        resources.webApp = webApp;
+        return creator.addAppInsightsExtension(resources);
     }).then(aiExtension => {
-        resources.appInsightsExtension = aiExtension;
         console.log('AppInsights extension created: ' + aiExtension.id);
+        resources.appInsightsExtension = aiExtension;
     });
