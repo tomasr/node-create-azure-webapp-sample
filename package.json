@@ -1,0 +1,11 @@
+{
+  "name": "create-azure-webapp-sample",
+  "version": "0.1.0",
+  "description": "asdfsadf",
+  "main": "index.js",
+  "author": "Tomas Restrepo",
+  "dependencies": {
+    "azure": ">=2.0.0-preview",
+    "minimist": "1.2.0"
+  }
+}
